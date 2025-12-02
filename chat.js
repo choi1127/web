@@ -1,50 +1,57 @@
-document.getElementById("sendBtn").addEventListener("click", sendMessage);
-
+// 메시지 전송 기능
 async function sendMessage() {
-    const userInput = document.getElementById("inputBox").value.trim();
-    if (userInput === "") return;
-
-    const outputEl = document.getElementById("output");
-    outputEl.textContent = ""; // 기존 응답 지우기
-
+    const inputField = document.getElementById('user-input');
+    const chatBox = document.getElementById('chat-container');
+    const message = inputField.value.trim();
     
-const url = "https://ictrobot.hknu.ac.kr/ollama/api/chat";
-    const payload = {
-        model: "llama3.1",
-        messages: [
-            { role: "user", content: userInput }
-        ]
-    };
+    if (!message) return; // 내용이 없으면 중단
 
-    const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-    });
+    // 1. 내 질문 화면에 표시
+    appendMessage(message, 'user-message');
+    inputField.value = ''; // 입력창 초기화
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    // 2. AI 응답 준비 ('...' 표시)
+    const aiMessageDiv = appendMessage('...', 'ai-message');
+    aiMessageDiv.innerText = ''; 
 
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+    try {
+        // 3. 백엔드 서버(app.py)로 전송
+        // ★주의: 서버가 다른 곳에 있다면 localhost 대신 IP 주소 입력
+        const response = await fetch('https://ictrobot.hknu.ac.kr/ollama/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        });
 
-        const text = decoder.decode(value);
-        const lines = text.split("\n").filter(line => line.trim());
+        // 4. 스트리밍 데이터 처리 (타자 효과)
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-        for (const line of lines) {
-            try {
-                const json = JSON.parse(line);
-
-                if (json.message && json.message.content) {
-                    // 🔥 한 토큰씩 실시간 출력
-                    outputEl.textContent += json.message.content;
-                    outputEl.scrollTop = outputEl.scrollHeight; // 자동 스크롤
-                }
-
-            } catch (e) {
-                // 파싱 중간 실패는 무시
-            }
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            // 데이터 조각을 글자로 변환 후 추가
+            const chunk = decoder.decode(value);
+            aiMessageDiv.innerText += chunk;
+            
+            // 스크롤을 항상 맨 아래로
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
+
+    } catch (error) {
+        console.error("에러 발생:", error);
+        aiMessageDiv.innerText = "서버 연결에 실패했습니다.";
     }
+}
+
+// 화면에 말풍선을 추가하는 함수
+function appendMessage(text, className) {
+    const chatBox = document.getElementById('chat-container');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${className}`;
+    msgDiv.innerText = text;
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return msgDiv;
 }
