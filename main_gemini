@@ -1,0 +1,10 @@
+from google import genai
+
+client = genai.Client(api_key="AIzaSyBAShJhuPn_5112BFYa86BFkzNGBxm00wI")
+
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="API가 뭔지 설명해줘."
+)
+
+print(response.text)
